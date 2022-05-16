@@ -1,0 +1,90 @@
+- hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    proj_name: "jumia"
+    nginx_host: localhost
+    nginx_port: 80
+    frontend_port: 8091
+    backend_port: 8092
+    postgresql_db_port: 5432
+    region: eu-west-2
+    size: 100
+    instance_type: db.m3.medium
+    db_engine: postgres    
+    parameter_group: dbpg1
+    subnet: ansible-sg1
+    security_groups:sg-XXXX
+    maint_window: "Sun:01:00-Sun:01:30"
+    backup_window: "02:00-02:30"
+    backup_retention: 14
+
+    zone: 
+    rds_instance_name: jumia-rds-db
+    db_name: jumia_phone_validator
+    username: jumia
+    jumia: jumia
+
+  tasks:
+  - name: Create the network
+    docker_network:
+      name: network
+
+  - name: start backend container
+    docker_container:
+      name: neuhausmatheus/repo:backend
+      source: pull
+      ports:
+        - "8091:8091"
+      links:
+        - postgresql_db
+      networks:
+        - name: network
+      state: "started"
+      restart: "yes"
+
+  - name: run frontend container
+    docker_container:
+      name: neuhausmatheus/repo:frontend
+      source: pull
+      ports:
+        - "8092 : 80"
+      networks:
+        - name: network
+      state: "started"
+      restart: "yes"
+
+  - name: start nginx container
+    docker_container:
+      name: neuhausmatheus/repo:backend
+      source: pull
+      ports:
+        - "80 : 80"
+      networks:
+        - name: network
+      state: "started"
+      restart: "yes"
+
+  - name: RDS
+    local_action:
+      module: rds
+      command: create
+      instance_name: "{{ rds_instance_name }}"
+      region: "{{ region }}"
+      size: "{{ size }}"
+      instance_type: "{{ instance_type }}"
+      db_engine: "{{ db_engine }}"
+      engine_version: "{{ engine_version }}"
+      subnet: "{{ subnet }}"
+      multi_zone: yes
+      port: 5432
+      db_name: "{{ db_name }}"
+      username: "{{ username }}"
+      jumia: "{{ jumia }}"
+      vpc_security_groups: "{{ security_groups }}"
+      maint_window: "{{ maint_window }}"
+      backup_window: "{{ backup_window }}"
+      backup_retention: "{{ backup_retention }}"
+      zone: "{{ zone }}"
